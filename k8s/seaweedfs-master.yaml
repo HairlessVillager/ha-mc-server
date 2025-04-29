@@ -1,0 +1,46 @@
+# Deployments
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seaweedfs-master
+  template:
+    metadata:
+      labels:
+        app: seaweedfs-master
+    spec:
+      containers:
+        - name: seaweedfs-master
+          image: chrislusf/seaweedfs:latest
+          command: ["weed", "master", "-defaultReplication=002", "-mdir=/data/master"]
+          ports:
+            - containerPort: 9333
+            - containerPort: 19333
+          volumeMounts:
+            - name: seaweedfs-master-data
+              mountPath: /data/master
+      volumes:
+        - name: seaweedfs-master-data
+          persistentVolumeClaim:
+            claimName: seaweedfs-master-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-master
+spec:
+  selector:
+    app: seaweedfs-master
+  ports:
+    - protocol: TCP
+      port: 9333
+      targetPort: 9333
+      name: webui
+    - protocol: TCP
+      port: 19333
+      targetPort: 19333
+      name: grpc

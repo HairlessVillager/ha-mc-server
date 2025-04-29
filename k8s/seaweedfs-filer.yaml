@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs-filer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seaweedfs-filer
+  template:
+    metadata:
+      labels:
+        app: seaweedfs-filer
+    spec:
+      containers:
+        - name: seaweedfs-filer
+          image: chrislusf/seaweedfs:latest
+          command: ["weed", "filer", "-master=seaweedfs-master:9333"]
+          ports:
+            - containerPort: 8888
+            - containerPort: 18888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-filer
+spec:
+  selector:
+    app: seaweedfs-filer
+  ports:
+    - protocol: TCP
+      port: 8888
+      targetPort: 8888
+      name: webui
+    - protocol: TCP
+      port: 18888
+      targetPort: 18888
+      name: grpc

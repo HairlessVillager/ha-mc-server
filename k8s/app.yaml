@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: httpd:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: web-data
+              mountPath: /usr/local/apache2/htdocs
+        - name: seaweedfs-mount
+          image: ubuntu:latest
+          # command: ["weed", "mount", "-filer=seaweedfs-filer:8888", "-dir=/data/seaweedfs"]
+          command: ["sleep", "inf"]
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]  # 添加必要的系统权限
+          # volumeMounts:
+          #   - name: web-data
+          #     mountPath: /data/seaweedfs
+      volumes:
+        - name: web-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+spec:
+  selector:
+    app: web-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
