@@ -123,12 +123,12 @@ class SeaweedfsClient:
         response = requests.get(url, params=params)
         return response.json()
 
-class SeaweedfsSyncer:
+class _SeaweedfsSyncerL2R:
 
-    def __init__(self, base_url: str):
-        self._client = SeaweedfsClient(base_url)
+    def __init__(self, client: SeaweedfsClient):
+        self._client = client
 
-    def sync_to_remote(self, local_path: str, remote_path: str):
+    def sync(self, local_path: str, remote_path: str):
         self._backup(remote_path)
         try:
             for local_file_path in self._get_local_files(local_path):
@@ -174,7 +174,12 @@ class SeaweedfsSyncer:
                 file_path = os.path.join(root, file)
                 yield file_path
 
-    def sync_from_remote(self, remote_path: str, local_path: str):
+class _SeaweedfsSyncerR2L:
+
+    def __init__(self, client: SeaweedfsClient):
+        self._client = client
+
+    def sync(self, remote_path: str, local_path: str):
         self._backup_local(local_path)
         try:
             os.makedirs(local_path, exist_ok=True)
@@ -193,8 +198,11 @@ class SeaweedfsSyncer:
         try:
             items = self._client.list(remote_path)
             for item in items.get("Entries", []):
-                child_path = str(PurePath(remote_path).joinpath(item["Name"]))
-                yield from self._get_remote_files(child_path)
+                child_path = item["FullPath"]
+                if item.get("Mode", 0) & 0o40000:
+                    yield from self._get_remote_files(child_path)
+                else:
+                    yield child_path
         except NotFound:
             if self._client.exists(remote_path):
                 yield remote_path
@@ -225,8 +233,20 @@ class SeaweedfsSyncer:
         if os.path.exists(backup_path):
             shutil.rmtree(backup_path)
             
+class SeaweedfsSyncer:
+
+    def __init__(self, base_url: str):
+        self._client = SeaweedfsClient(base_url)
+
+    def local2remote(self, local_path: str, remote_path: str):
+        l2r = _SeaweedfsSyncerL2R(self._client)
+        l2r.sync(local_path, remote_path)
+
+    def remote2local(self, remote_path: str, local_path: str):
+        r2l = _SeaweedfsSyncerR2L(self._client)
+        r2l.sync(remote_path, local_path)
+
 if __name__ == "__main__":
     syncer = SeaweedfsSyncer("http://localhost:8888")
-    syncer.sync_to_remote("../k8s", "/test-k8s")
-    breakpoint()
-    syncer.sync_from_remote("/test-k8s", "../k8s2")
+    syncer.local2remote("../k8s", "/test-k8s")
+    syncer.remote2local("/test-k8s", "../k8s2")
