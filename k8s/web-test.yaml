@@ -13,21 +13,32 @@ spec:
         app: web-app
     spec:
       initContainers:
-        - name: pull-save
+        - name: migrater
           image: ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+          restartPolicy: Always
           env:
             - name: MIGRATER_LOCAL_PATH
-              value: "/mc-save"
+              value: /mc-save
             - name: MIGRATER_REMOTE_PATH
-              value: "/mc-save"
+              value: /mc-save
             - name: SEAWEEDFS_FILER_URL
               value: "http://seaweedfs-filer:8888"
           volumeMounts:
             - name: mc-save
               mountPath: /mc-save
           args:
-            - "pull"
+            - server
+            - --port=9000
+            - --pull-first
       containers:
+        # - name: migrater
+        #   image: ccr.ccs.tencentyun.com/qcloud/ubuntu:latest
+        #   command:
+        #     - sleep
+        #     - inf
+        #   volumeMounts:
+        #     - name: mc-save
+        #       mountPath: /mc-save
         - name: web-app
           image: ccr.ccs.tencentyun.com/ha-mc-server/httpd:latest
           ports:
@@ -53,23 +64,36 @@ spec:
       port: 80
       targetPort: 80
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: migrater
+spec:
+  selector:
+    app: web-app
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: hello
+  name: saving
 spec:
   schedule: "* * * * *"
   jobTemplate:
     spec:
-      ttlSecondsAfterFinished: 600
       template:
         spec:
           containers:
-          - name: hello
-            image: busybox:1.28
-            imagePullPolicy: IfNotPresent
-            command:
-            - /bin/sh
-            - -c
-            - date; echo Hello from the Kubernetes cluster
-          restartPolicy: OnFailure
+            - name: let-migrater-push
+              image: ccr.ccs.tencentyun.com/ha-mc-server/curl:latest
+              imagePullPolicy: IfNotPresent
+              args:
+                - -X
+                - POST
+                - http://migrater:9000/push
+          imagePullSecrets:
+            - name: regcred
+          restartPolicy: Never

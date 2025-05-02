@@ -4,7 +4,7 @@
 
 传统的 Minecraft 服务只把游戏服务端部署在一台服务器上，一旦这台机器出现故障（例如进程崩溃、网络中断或者硬件损坏等）整个游戏服务就会不可用，玩家需要等待甚至催促服主尽快修复服务；如果硬盘损坏或数据丢失，那么整个存档都会毁于一旦！相对于传统的单体服务，高可用服务把游戏服务分布式部署在多个地区的不同的服务器上，当节点故障时，Kubernetes 会自动把游戏服务迁移到其他机器上，从而避免服务不可用。
 
-为了获取足够多的不同地区的机器（至少 2 台，建议 3 台以上，不同地区的机器越多服务可用时间越长），服主往往需要征集*志愿者*提供机器并部署服务。志愿者往往不是计算机方面的专业人员，同时可能只有一台家用 PC 而不是专业的机柜服务器。为了征集到足够多的志愿者，这个项目1）使用 Docker 和 k3s 来简化安装过程；2）使用 k3s 来降低维护集群产生的额外开销。**[这个章节](#志愿者志愿者)面向志愿者介绍了如何部署服务。**
+为了获取足够多的不同地区的机器（至少 2 台，建议 3 台以上，不同地区的机器越多服务可用时间越长），服主往往需要征集*志愿者*提供机器并部署服务。志愿者往往不是计算机方面的专业人员，同时可能只有一台家用 PC 而不是专业的机柜服务器。为了征集到足够多的志愿者，这个项目1）使用 Docker 和 k3s 来简化安装过程；2）使用 k3s 来降低维护集群产生的额外开销。**[这个章节](#志愿者)面向志愿者介绍了如何部署服务。**
 
 这个项目主要解决以下两个问题：
 1. 节点故障导致游戏服务端进程不可用：通过 K3s 自动迁移游戏服务进程。
@@ -64,7 +64,7 @@ docker run -d --privileged -p 6443:6443 -p 10250:10250 rancher/k3s server --node
 
 确保你的防火墙放行了 6443 和 10250 端口的入流量。
 
-### 获取 token
+#### 获取 token
 
 为了安全性，志愿者的机器在加入集群时需要验证 token。这里的 token 可以由服主通过以下命令生成：
 ```
@@ -73,9 +73,34 @@ k3s token create
 
 这个命令会输出一个 token，有效期为 24 小时。可以通过`--ttl`调整有效时间。更多信息参考：https://docs.k3s.io/zh/cli/token
 
+### 构建并上传镜像
+
+这个项目没有上传镜像到 DockerHub 或类似的平台，所以需要手动构建并上传镜像到仓库。
+
+#### 构建 Migrater 镜像
+
+在项目根目录运行以下命令：
+```
+docker build -t migrater:latest ./migrater
+```
+
+#### 上传镜像
+
+我们需要把镜像上传到镜像服务上，这里有 2 种选择：
+1）上传到 DockerHub 或其他托管服务上；
+2）自行部署镜像服务。
+
+以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。
+```
+docker tag migrater:latest ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+docker push ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+```
+
+上传成功后我们接下来需要参考 [Kubernetes 的文档](https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-secret-by-providing-credentials-on-the-command-line)创建 Secret 来获取私有镜像。
+
 ### 部署 SeaweedFS 服务
 
-...
+登录
 
 ### 部署 Minecraft 游戏服务
 
