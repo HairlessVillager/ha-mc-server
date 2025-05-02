@@ -14,11 +14,13 @@ spec:
     spec:
       containers:
         - name: seaweedfs-filer
-          image: chrislusf/seaweedfs:latest
+          image: ccr.ccs.tencentyun.com/ha-mc-server/seaweedfs:latest
           command: ["weed", "filer", "-master=seaweedfs-master:9333"]
           ports:
             - containerPort: 8888
             - containerPort: 18888
+      imagePullSecrets:
+        - name: regcred
 ---
 apiVersion: v1
 kind: Service

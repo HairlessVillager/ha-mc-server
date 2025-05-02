@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      initContainers:
+        - name: pull-save
+          image: ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+          env:
+            - name: MIGRATER_LOCAL_PATH
+              value: "/mc-save"
+            - name: MIGRATER_REMOTE_PATH
+              value: "/mc-save"
+            - name: SEAWEEDFS_FILER_URL
+              value: "http://seaweedfs-filer:8888"
+          volumeMounts:
+            - name: mc-save
+              mountPath: /mc-save
+          args:
+            - "pull"
+      containers:
+        - name: web-app
+          image: ccr.ccs.tencentyun.com/ha-mc-server/httpd:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: mc-save
+              mountPath: /usr/local/apache2/htdocs
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: mc-save
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+spec:
+  selector:
+    app: web-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          containers:
+          - name: hello
+            image: busybox:1.28
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+          restartPolicy: OnFailure
