@@ -1,8 +1,9 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: seaweedfs-volume
 spec:
+  serviceName: seaweedfs-volume
   replicas: 3
   selector:
     matchLabels:
@@ -17,24 +18,17 @@ spec:
           image: ccr.ccs.tencentyun.com/ha-mc-server/seaweedfs:latest
           command: ["weed", "volume", "-mserver=seaweedfs-master:9333", "-dir=/data"]
           volumeMounts:
-            - name: seaweedfs-data
+            - name: seaweedfs-volume-data
               mountPath: /data
           ports:
             - containerPort: 8080
       imagePullSecrets:
         - name: regcred
-      volumes:
-        - name: seaweedfs-data
-          emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: seaweedfs-volume
-spec:
-  selector:
-    app: seaweedfs-volume
-  ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
+  volumeClaimTemplates:
+    - metadata:
+        name: seaweedfs-volume-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi

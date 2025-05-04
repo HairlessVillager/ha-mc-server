@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: web-app
+  name: mc-server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: web-app
+      app: mc-server
   template:
     metadata:
       labels:
-        app: web-app
+        app: mc-server
     spec:
       initContainers:
         - name: migrater
@@ -31,13 +31,26 @@ spec:
             - --port=9000
             - --pull-first
       containers:
-        - name: web-app
-          image: ccr.ccs.tencentyun.com/ha-mc-server/httpd:latest
+        - name: mc-server
+          image: ccr.ccs.tencentyun.com/ha-mc-server/mc-server:latest
           ports:
-            - containerPort: 80
+            - containerPort: 25565
+            - containerPort: 25575
           volumeMounts:
             - name: mc-save
-              mountPath: /usr/local/apache2/htdocs
+              mountPath: /mc/save
+          command:
+            - java
+            - -Xms256M
+            - -Xmx2G
+            - -XX:+UseG1GC
+            - -Dfile.encoding=UTF-8
+            - -jar
+            - spigot-1.21.4.jar
+            - --nogui
+            - --noconsole
+            - -W
+            - ./save
       imagePullSecrets:
         - name: regcred
       volumes:
@@ -47,14 +60,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: web-app
+  name: mc-server
 spec:
   selector:
-    app: web-app
+    app: mc-server
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 80
+      port: 25565
+      targetPort: 25565
+      name: game
+    - protocol: TCP
+      port: 25575
+      targetPort: 25575
+      name: rcon
 ---
 apiVersion: v1
 kind: Service
@@ -62,7 +80,7 @@ metadata:
   name: migrater
 spec:
   selector:
-    app: web-app
+    app: mc-server
   ports:
     - protocol: TCP
       port: 9000
@@ -73,7 +91,7 @@ kind: CronJob
 metadata:
   name: saving
 spec:
-  schedule: "*/10 * * * *"
+  schedule: "*/2 * * * *"
   jobTemplate:
     spec:
       template:
