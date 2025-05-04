@@ -107,7 +107,7 @@ def main():
     server_parser.add_argument(
         "--pull-first",
         action="store_true",
-        help="Do a pull before serving",
+        help="Try to pull before serving (default: true)",
     )
 
     args = parser.parse_args()
@@ -122,8 +122,11 @@ def main():
 
     if args.operation == "server":
         if args.pull_first:
-            logger.info("Pulling...")
-            migrater.pull()
+            try:
+                logger.info("Pulling...")
+                migrater.pull()
+            except Exception as e:
+                logger.warning(f"Pulling...failed with error: {e}")
         migrater_instance = migrater
         logger.info("Starting server...")
         start_server(args.host, args.port)

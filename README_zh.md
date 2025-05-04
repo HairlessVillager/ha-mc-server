@@ -77,6 +77,48 @@ k3s token create
 
 这个项目没有上传镜像到 DockerHub 或类似的平台，所以需要手动构建并上传镜像到仓库。
 
+#### 构建 Spigot 镜像
+
+这一节以 Minecraft 1.21.4 版本下的 Spigot 为例，其要求的 Java 版本为 24。
+
+如果你希望安装其他版本的 Spigot，请注意修改相关命令中的 Java 版本号和 Spigot 版本号。具体的 Minecraft 和 Java 版本的对应关系可以参考 [Spigot 的文档](https://www.spigotmc.org/wiki/buildtools/#prerequisites)。
+
+##### 编译 sgipot.jar
+
+Spigot 是第三方 Minecraft JE Server，其本体为一个 `spigot-ver.jar` 文件。这里我们使用 Spigot 提供的 BuildTool.jar 来编译得到这个文件。
+
+为了统一环境并且防止污染本地环境，这里使用 Docker 镜像来搭建编译环境并编译。
+
+在项目根目录运行以下命令启动并进入一个 Azul Platform Core 容器：
+```
+docker run -it --name spigot-build azul/zulu-openjdk:24-latest
+```
+
+在容器内依次执行以下命令：
+```
+apt-get update
+apt-get install -y gnupg ca-certificates curl git
+curl -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
+java -jar BuildTools.jar --rev 1.21.4
+```
+
+编译成功后，使用以下命令拷贝文件到 ./migrater 目录下：
+```
+docker cp spigot-build:/spigot-1.21.4.jar ./migrater
+```
+
+提示拷贝成功之后，使用以下命令删除容器：
+```
+docker rm spigot-build
+```
+
+##### 构建镜像
+
+在项目根目录下运行以下命令：
+```
+docker build -t mc-server --build-arg BASE_IMAGE=azul/zulu-openjdk:24-latest --build-arg SPIGOT_FILE=spigot-1.21.4.jar --build-arg EULA=true ./spigot 
+```
+
 #### 构建 Migrater 镜像
 
 在项目根目录运行以下命令：
@@ -90,21 +132,36 @@ docker build -t migrater:latest ./migrater
 1）上传到 DockerHub 或其他托管服务上；
 2）自行部署镜像服务。
 
-以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。
+以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。例如你希望上传你刚刚构建的`migrater`镜像：
 ```
 docker tag migrater:latest ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
 docker push ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
 ```
+其他镜像同理。
 
 上传成功后我们接下来需要参考 [Kubernetes 的文档](https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-secret-by-providing-credentials-on-the-command-line)创建 Secret 来获取私有镜像。
 
-### 部署 SeaweedFS 服务
+### 部署服务
 
-登录
+登录 K3s Server 节点，使用以下命令确认 K3s 正在运行且节点数量符合预期：
+```
+kubectl get nodes
+```
 
-### 部署 Minecraft 游戏服务
+在节点的合适位置克隆本仓库，在仓库根目录下运行以下命令：
+```
+kubectl apply -f ./k8s/seaweedfs/master.yaml
+kubectl apply -f ./k8s/seaweedfs/volume.yaml
+kubectl apply -f ./k8s/seaweedfs/filer.yaml
+kubectl apply -f ./k8s/mc-server.yaml
+```
 
-...
+然后使用以下命令暴露端口：
+```
+kubectl port-forward svc/mc-server 25565:25565
+```
+
+然后在你的 PC 上启动客户端，加入 xx.xx.xx.xx:25565 服务即可进入游玩。
 
 ## 志愿者
 
