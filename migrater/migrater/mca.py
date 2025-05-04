@@ -1,5 +1,6 @@
 from io import BufferedReader, BufferedWriter
 import itertools
+from lzma import LZMACompressor
 from typing import NamedTuple
 import zlib
 from itertools import islice, chain, repeat
@@ -155,17 +156,23 @@ class MCACompressor:
         self._convert_to(2, mca_f)
 
 if __name__ == "__main__":
-    mca_path = "/Users/authing/Desktop/ha-mc-server/migrater/r.-1.0.1-21-4.mca"
-    # mca_path = "/Users/authing/Desktop/ha-mc-server/migrater/r.0.0.1-15-2.mca"
-    # with (
-    #     open(mca_path, "rb") as mca_f,
-    #     open(mca_path + ".decompressed", "wb") as mca_f2,
-    # ):
-    #     decompress = MCACompressor(mca_f)
-    #     decompress.decompress_to(mca_f2)
+    mca1_path = "/Users/authing/Desktop/ha-mc-server/migrater/r.-1.0.1-21-4.mca.decompressed"
+    mca2_path = "/Users/authing/Desktop/ha-mc-server/migrater/r.-1.0.1-21-4.new.mca.decompressed"
     with (
-        open(mca_path + ".decompressed", "rb") as mca_f,
-        open(mca_path + ".2", "wb") as mca_f2,
+        open(mca1_path, "rb") as mca_f1,
+        open(mca2_path, "rb") as mca_f2,
     ):
-        decompress = MCACompressor(mca_f)
-        decompress.compress_to(mca_f2)
+        base = 8192
+        length = 9999999999999
+        # a = mca_f1.read()[:base]
+        # b = mca_f2.read()[:base]
+        # a = mca_f1.read()[base:base+length]
+        # b = mca_f2.read()[base:base+length]
+        a = mca_f1.read()
+        b = mca_f2.read()
+        x = LZMACompressor()
+        d = bytearray()
+        d.extend(x.compress(a))
+        d.extend(x.compress(b))
+        d.extend(x.flush())
+        print(len(d))
