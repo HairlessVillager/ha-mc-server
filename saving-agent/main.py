@@ -1,5 +1,6 @@
 import argparse
 from os import getenv
+from time import time
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -15,16 +16,26 @@ migrater_instance = None
 
 @app.post("/saving")
 async def saving():
+    time0 = time()
     logger.info("Saving: save-all from game")
-    with MCRcon(host='mc-server', port=25575, password='rcon123') as client:
-        response = client.command('save-all flush')
-    logger.debug(f"RCON response: {response}")
-    logger.info("Saving: push to the remote")
-    if migrater_instance:
-        migrater_instance.push()
-        return
-    else:
-        raise HTTPException(status_code=500, detail="Migrater not initialized")
+    with MCRcon(host="mc-server", port=25575, password="rcon123") as client:
+        try:
+            client.command("say Saving the game...")
+            response = client.command("save-all flush")
+            logger.debug(f"RCON response: {response}")
+            time1 = time()
+            client.command(f"say Saving the game...flushed in {time1 - time0:.3f}s")
+            logger.info("Saving: push to the remote")
+            if migrater_instance:
+                migrater_instance.push()
+                time2 = time()
+                client.command(f"say Saving the game...pushed in {time2 - time1:.3f}s")
+                client.command("say Saving the game...done")
+                return
+            else:
+                raise HTTPException(status_code=500, detail="Migrater not initialized")
+        except Exception:
+            client.command("say Saving the game...failed")
 
 
 def start_server(host: str, port: int):

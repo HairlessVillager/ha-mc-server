@@ -83,8 +83,6 @@ k3s token create
 
 如果你希望安装其他版本的 Spigot，请注意修改相关命令中的 Java 版本号和 Spigot 版本号。具体的 Minecraft 和 Java 版本的对应关系可以参考 [Spigot 的文档](https://www.spigotmc.org/wiki/buildtools/#prerequisites)。
 
-##### 编译 sgipot.jar
-
 Spigot 是第三方 Minecraft JE Server，其本体为一个 `spigot-ver.jar` 文件。这里我们使用 Spigot 提供的 BuildTool.jar 来编译得到这个文件。
 
 为了统一环境并且防止污染本地环境，这里使用 Docker 镜像来搭建编译环境并编译。
