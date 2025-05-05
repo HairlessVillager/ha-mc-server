@@ -102,9 +102,9 @@ curl -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSucce
 java -jar BuildTools.jar --rev 1.21.4
 ```
 
-编译成功后，使用以下命令拷贝文件到 ./migrater 目录下：
+编译成功后，使用以下命令拷贝文件到 ./spigot 目录下：
 ```
-docker cp spigot-build:/spigot-1.21.4.jar ./migrater
+docker cp spigot-build:/spigot-1.21.4.jar ./spigot
 ```
 
 提示拷贝成功之后，使用以下命令删除容器：
@@ -112,18 +112,16 @@ docker cp spigot-build:/spigot-1.21.4.jar ./migrater
 docker rm spigot-build
 ```
 
-##### 构建镜像
-
-在项目根目录下运行以下命令：
+在项目根目录下运行以下命令来构建 Spigot镜像：
 ```
 docker build -t mc-server --build-arg BASE_IMAGE=azul/zulu-openjdk:24-latest --build-arg SPIGOT_FILE=spigot-1.21.4.jar --build-arg EULA=true ./spigot 
 ```
 
-#### 构建 Migrater 镜像
+#### 构建 Saving-agent 镜像
 
 在项目根目录运行以下命令：
 ```
-docker build -t migrater:latest ./migrater
+docker build -t saving-agent:latest ./saving-agent
 ```
 
 #### 上传镜像
@@ -132,10 +130,10 @@ docker build -t migrater:latest ./migrater
 1）上传到 DockerHub 或其他托管服务上；
 2）自行部署镜像服务。
 
-以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。例如你希望上传你刚刚构建的`migrater`镜像：
+以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。例如你希望上传你刚刚构建的`saving-agent`镜像：
 ```
-docker tag migrater:latest ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
-docker push ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+docker tag saving-agent:latest ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
+docker push ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 ```
 其他镜像同理。
 
@@ -148,11 +146,19 @@ docker push ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
 kubectl get nodes
 ```
 
-在节点的合适位置克隆本仓库，在仓库根目录下运行以下命令：
+在节点的合适位置克隆本仓库，在仓库根目录下运行以下命令来启动 SeaweedFS 服务：
 ```
 kubectl apply -f ./k8s/seaweedfs/master.yaml
 kubectl apply -f ./k8s/seaweedfs/volume.yaml
 kubectl apply -f ./k8s/seaweedfs/filer.yaml
+```
+
+在启动游戏之前，你可以通过以下方式上传你的初始存档（如果有的话）：
+1. 首先启动一个命令行窗口，运行`kubectl port-forward svc/seaweedfs-filer 8888:8888`，把 SeaweedFS Filer 服务暴露到宿主机上；
+2. 保持上面的命令运行，然后启动另外一个窗口，在项目的根目录运行`uv run saving-agent/main.py push --local-path <your-save-path> --remote-path /mc-save --filer-url http://localhost:8888`
+
+运行下面的命令启动游戏服务：
+```
 kubectl apply -f ./k8s/mc-server.yaml
 ```
 
@@ -161,7 +167,7 @@ kubectl apply -f ./k8s/mc-server.yaml
 kubectl port-forward svc/mc-server 25565:25565
 ```
 
-然后在你的 PC 上启动客户端，加入 xx.xx.xx.xx:25565 服务即可进入游玩。
+最后在你的 PC 上启动客户端，加入 xx.xx.xx.xx:25565 服务即可进入游玩。
 
 ## 志愿者
 

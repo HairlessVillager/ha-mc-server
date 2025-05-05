@@ -13,8 +13,8 @@ spec:
         app: mc-server
     spec:
       initContainers:
-        - name: migrater
-          image: ccr.ccs.tencentyun.com/ha-mc-server/migrater:latest
+        - name: saving-agent
+          image: ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
           restartPolicy: Always
           env:
             - name: MIGRATER_LOCAL_PATH
@@ -30,9 +30,12 @@ spec:
             - server
             - --port=9000
             - --pull-first
+        - name: waiting-for-initial-pulling
+          image: ccr.ccs.tencentyun.com/ha-mc-server/busybox:latest
+          command: ['sleep', '30']
       containers:
         - name: mc-server
-          image: ccr.ccs.tencentyun.com/ha-mc-server/mc-server:latest
+          image: ccr.ccs.tencentyun.com/ha-mc-server/mc-server:0.1.1
           ports:
             - containerPort: 25565
             - containerPort: 25575
@@ -41,6 +44,7 @@ spec:
               mountPath: /mc/save
           command:
             - java
+          args:
             - -Xms256M
             - -Xmx2G
             - -XX:+UseG1GC
@@ -77,7 +81,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: migrater
+  name: saving-agent
 spec:
   selector:
     app: mc-server
@@ -103,7 +107,7 @@ spec:
               args:
                 - -X
                 - POST
-                - http://migrater:9000/push
+                - http://saving-agent:9000/saving
           imagePullSecrets:
             - name: regcred
           restartPolicy: Never

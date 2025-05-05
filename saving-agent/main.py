@@ -4,6 +4,7 @@ from os import getenv
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from loguru import logger
+from mcrcon import MCRcon
 
 from migrater.seaweedfs import TrivialMigrater
 
@@ -12,19 +13,15 @@ app = FastAPI()
 migrater_instance = None
 
 
-@app.post("/push")
-async def handle_push():
+@app.post("/saving")
+async def saving():
+    logger.info("Saving: save-all from game")
+    with MCRcon(host='mc-server', port=25575, password='rcon123') as client:
+        response = client.command('save-all flush')
+    logger.debug(f"RCON response: {response}")
+    logger.info("Saving: push to the remote")
     if migrater_instance:
         migrater_instance.push()
-        return
-    else:
-        raise HTTPException(status_code=500, detail="Migrater not initialized")
-
-
-@app.post("/pull")
-async def handle_pull():
-    if migrater_instance:
-        migrater_instance.pull()
         return
     else:
         raise HTTPException(status_code=500, detail="Migrater not initialized")
@@ -35,7 +32,7 @@ def start_server(host: str, port: int):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SeaweedFS Migration Tool")
+    parser = argparse.ArgumentParser(description="Saving Agent")
 
     subparsers = parser.add_subparsers(dest="operation", required=True)
 
