@@ -12,6 +12,13 @@ spec:
       labels:
         app: mc-server
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: limited-computing
+                operator: DoesNotExist
       initContainers:
         - name: saving-agent
           image: ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest

@@ -139,10 +139,24 @@ docker push ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 
 ### 部署服务
 
+#### 标记节点
+
 登录 K3s Server 节点，使用以下命令确认 K3s 正在运行且节点数量符合预期：
 ```
 kubectl get nodes
 ```
+
+如果你的集群中有一些节点，它们的 CPU 性能和内存大小不足以支撑 Minecraft Server 计算服务，那么你可以给这些节点贴上`limited-computing`标签，以便 K8s 更好地给节点分配资源：
+```
+kubectl label node <your-node-name> limited-computing=true
+```
+
+如果节点名称不小心写错了，可以用以下命令移除标签：
+```
+kubectl label node <your-node-name> limited-computing-
+```
+
+#### 创建 SeaweedFS 资源
 
 在节点的合适位置克隆本仓库，在仓库根目录下运行以下命令来启动 SeaweedFS 服务：
 ```
@@ -151,14 +165,20 @@ kubectl apply -f ./k8s/seaweedfs/volume.yaml
 kubectl apply -f ./k8s/seaweedfs/filer.yaml
 ```
 
+#### 上传初始存档
+
 在启动游戏之前，你可以通过以下方式上传你的初始存档（如果有的话）：
 1. 首先启动一个命令行窗口，运行`kubectl port-forward svc/seaweedfs-filer 8888:8888`，把 SeaweedFS Filer 服务暴露到宿主机上；
 2. 保持上面的命令运行，然后启动另外一个窗口，在项目的根目录运行`uv run saving-agent/main.py push --local-path <your-save-path> --remote-path /mc-save --filer-url http://localhost:8888`
+
+#### 创建 Minecraft Server 及配套设施资源
 
 运行下面的命令启动游戏服务：
 ```
 kubectl apply -f ./k8s/mc-server.yaml
 ```
+
+#### 暴露端口
 
 然后使用以下命令暴露端口：
 ```
