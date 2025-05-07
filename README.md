@@ -35,19 +35,19 @@ There are two ways to deploy K3s:
 Bare-metal deployment installs K3s directly on the server without relying on any middleware. This requires the server's operating system to be Linux.
 
 Refer to the [K3s documentation](https://docs.k3s.io/zh/quick-start#%E5%AE%89%E8%A3%85%E8%84%9A%E6%9C%AC) and run the following command to deploy K3s:
-```
+```bash
 curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn sh -
 ```
 
 After the installation is complete, refer to [this document](https://docs.k3s.io/zh/networking/distributed-multicloud#embedded-k3s-multicloud-solution) to edit the `/etc/systemd/system/k3s.service` file and append the `--node-external-ip` parameter (where `xx.xx.xx.xx` is the public IP address of the machine) to the `ExecStart` configuration item at the end:
-```
+```bash
 ExecStart=/usr/local/bin/k3s \
     server \
     --node-external-ip xx.xx.xx.xx \
 ```
 
 Then use the following commands to update the configuration:
-```
+```bash
 systemctl daemon-reload
 systemctl restart k3s
 ```
@@ -59,7 +59,7 @@ Containerized deployment utilizes Docker as a virtualization middleware and uses
 First, you need to install Docker. Refer to the official documentation: [Docker Installation](https://docs.docker.com/get-started/get-docker/)
 
 Then, use the following command to start a K3s container as the K3s Server node (where `xx.xx.xx.xx` is the public IP address of the machine):
-```
+```bash
 docker run -d --privileged -p 6443:6443 -p 10250:10250 rancher/k3s server --node-external-ip xx.xx.xx.xx
 ```
 
@@ -68,7 +68,7 @@ Make sure your firewall allows inbound traffic on ports 6443 and 10250.
 #### Obtaining the Token
 
 For security reasons, volunteers' machines need to verify a token when joining the cluster. The server owner can generate a token using the following command:
-```
+```bash
 k3s token create
 ```
 
@@ -89,12 +89,12 @@ Spigot is a third-party Minecraft JE Server, and its main body is a `spigot-ver.
 To unify the environment and prevent contamination of the local environment, we use a Docker image to set up the compilation environment and compile it.
 
 Run the following command in the project root directory to start and enter an Azul Platform Core container:
-```
+```bash
 docker run -it --name spigot-build azul/zulu-openjdk:24-latest
 ```
 
 Inside the container, execute the following commands in sequence:
-```
+```bash
 apt-get update
 apt-get install -y gnupg ca-certificates curl git
 curl -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
@@ -102,24 +102,24 @@ java -jar BuildTools.jar --rev 1.21.4
 ```
 
 After successful compilation, use the following command to copy the file to the `./spigot` directory:
-```
+```bash
 docker cp spigot-build:/spigot-1.21.4.jar ./spigot
 ```
 
 Once the copy is successful, use the following command to delete the container:
-```
+```bash
 docker rm spigot-build
 ```
 
 Run the following command in the project root directory to build the Spigot image:
-```
+```bash
 docker build -t mc-server --build-arg BASE_IMAGE=azul/zulu-openjdk:24-latest --build-arg SPIGOT_FILE=spigot-1.21.4.jar --build-arg EULA=true ./spigot
 ```
 
 #### Building the Saving-agent Image
 
 Run the following command in the project root directory:
-```
+```bash
 docker build -t saving-agent:latest ./saving-agent
 ```
 
@@ -130,7 +130,7 @@ We need to upload the image to an image service, and there are two options:
 2. Deploy your own image service.
 
 Taking Tencent Cloud's image hosting service as an example, we can refer to [Tencent Cloud's documentation](https://cloud.tencent.com/document/product/1141/63910) to activate the service and upload the image. For example, if you want to upload the `saving-agent` image you just built:
-```
+```bash
 docker tag saving-agent:latest ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 docker push ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 ```
@@ -143,10 +143,62 @@ After successful upload, we need to refer to the [Kubernetes documentation](http
 #### Labeling Nodes
 
 Log in to the K3s Server node and use the following command to confirm that K3s is running and the number of nodes meets expectations:
-```
+```bash
 kubectl get nodes
 ```
 
 If some nodes in your cluster have insufficient CPU performance and memory size to support the Minecraft Server computing service, you can label these nodes with `limited-computing` to help K8s better allocate resources to the nodes:
+```bash
+kubectl label node <your-node-name> limited-computing=true
 ```
-kubectl label node <your-node-name> limited-com
+
+If you accidentally write the wrong node name, you can use the following command to remove the label:
+```bash
+kubectl label node <your-node-name> limited-computing-
+```
+
+#### Creating SeaweedFS Resources
+
+Clone this repository to a suitable location on the node and run the following commands in the repository root directory to start the SeaweedFS service:
+```bash
+kubectl apply -f ./k8s/seaweedfs/master.yaml
+kubectl apply -f ./k8s/seaweedfs/volume.yaml
+kubectl apply -f ./k8s/seaweedfs/filer.yaml
+```
+
+#### Uploading Initial Saves
+
+Before starting the game, you can upload your initial save (if any) in the following way:
+1. First, start a command-line window and run `kubectl port-forward svc/seaweedfs-filer 8888:8888` to expose the SeaweedFS Filer service to the host machine;
+2. Keep the above command running, then start another window and run `uv run saving-agent/main.py push --local-path <your-save-path> --remote-path /mc-save --filer-url http://localhost:8888` in the project root directory.
+
+#### Creating Minecraft Server and Supporting Resources
+
+Run the following command to start the game service:
+```bash
+kubectl apply -f ./k8s/mc-server.yaml
+```
+
+#### Exposing the Port
+
+Then use the following command to expose the port:
+```bash
+kubectl port-forward svc/mc-server 25565:25565
+```
+
+Finally, start the client on your PC and join the xx.xx.xx.xx:25565 service to start playing.
+
+## Volunteers
+
+Volunteers provide most of the machines in the cluster. The more nodes there are, the higher the service availability. From this perspective, volunteers are the most contributing group in the entire project.
+
+Considering that volunteers usually do not have professional equipment and knowledge, this section only considers deploying the service on the Windows system using Docker:
+
+First, you need to install Docker. Refer to the official documentation: [Docker Installation](https://docs.docker.com/get-started/get-docker/)
+
+Then, use the following command to start a K3s container as a K3s Agent node (where `myserver` should be replaced with the server owner's domain name or public IP, `mytoken` should be replaced with the token provided by the server owner, and `mynodename` can be replaced with your game ID):
+```bash
+docker run -d --privileged rancher/k3s agent --token mytoken --server https://myserver:6443 --snapshotter native --node-name mynodename
+```
+
+Then wait for the server owner to confirm that your machine has joined the cluster.

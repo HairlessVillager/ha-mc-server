@@ -35,12 +35,12 @@ K3s 的部署有两种方式：
 裸金属部署方式会把 K3s 直接部署在服务器上，而不依赖其他中间件。这要求服务器的操作系统必须是 Linux 系统。
 
 参考 [K3s 的文档](https://docs.k3s.io/zh/quick-start#%E5%AE%89%E8%A3%85%E8%84%9A%E6%9C%AC)运行以下命令来部署 K3s：
-```
+```bash
 curl -sfL https://rancher-mirror.rancher.cn/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn sh -
 ```
 
 等待安装完毕后参考[这篇文档](https://docs.k3s.io/zh/networking/distributed-multicloud#embedded-k3s-multicloud-solution)编辑 `/etc/systemd/system/k3s.service` 文件，在末尾的 `ExecStart` 配置项中像下面这样追加`--node-external-ip`参数（其中`xx.xx.xx.xx`是机器的公网 IP 地址）：
-```
+```bash
 ExecStart=/usr/local/bin/k3s \
     server \
     --node-external-ip xx.xx.xx.xx \
@@ -48,7 +48,7 @@ ExecStart=/usr/local/bin/k3s \
 ```
 
 然后使用以下命令更新配置：
-```
+```bash
 systemctl daemon-reload
 systemctl restart k3s
 ```
@@ -60,7 +60,7 @@ systemctl restart k3s
 首先需要安装 Docker，参考官方文档：https://docs.docker.com/get-started/get-docker/
 
 然后使用以下命令启动一个 K3s 容器作为 K3s Server 节点（其中`xx.xx.xx.xx`是机器的公网 IP 地址）：
-```
+```bash
 docker run -d --privileged -p 6443:6443 -p 10250:10250 rancher/k3s server --node-external-ip xx.xx.xx.xx
 ```
 
@@ -69,7 +69,7 @@ docker run -d --privileged -p 6443:6443 -p 10250:10250 rancher/k3s server --node
 #### 获取 token
 
 为了安全性，志愿者的机器在加入集群时需要验证 token。这里的 token 可以由服主通过以下命令生成：
-```
+```bash
 k3s token create
 ```
 
@@ -90,12 +90,12 @@ Spigot 是第三方 Minecraft JE Server，其本体为一个 `spigot-ver.jar` �
 为了统一环境并且防止污染本地环境，这里使用 Docker 镜像来搭建编译环境并编译。
 
 在项目根目录运行以下命令启动并进入一个 Azul Platform Core 容器：
-```
+```bash
 docker run -it --name spigot-build azul/zulu-openjdk:24-latest
 ```
 
 在容器内依次执行以下命令：
-```
+```bash
 apt-get update
 apt-get install -y gnupg ca-certificates curl git
 curl -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
@@ -103,24 +103,24 @@ java -jar BuildTools.jar --rev 1.21.4
 ```
 
 编译成功后，使用以下命令拷贝文件到 ./spigot 目录下：
-```
+```bash
 docker cp spigot-build:/spigot-1.21.4.jar ./spigot
 ```
 
 提示拷贝成功之后，使用以下命令删除容器：
-```
+```bash
 docker rm spigot-build
 ```
 
 在项目根目录下运行以下命令来构建 Spigot镜像：
-```
+```bash
 docker build -t mc-server --build-arg BASE_IMAGE=azul/zulu-openjdk:24-latest --build-arg SPIGOT_FILE=spigot-1.21.4.jar --build-arg EULA=true ./spigot 
 ```
 
 #### 构建 Saving-agent 镜像
 
 在项目根目录运行以下命令：
-```
+```bash
 docker build -t saving-agent:latest ./saving-agent
 ```
 
@@ -131,7 +131,7 @@ docker build -t saving-agent:latest ./saving-agent
 2）自行部署镜像服务。
 
 以腾讯云的镜像托管服务为例，我们可以参考[腾讯云的文档](https://cloud.tencent.com/document/product/1141/63910)来开通服务并上传镜像。例如你希望上传你刚刚构建的`saving-agent`镜像：
-```
+```bash
 docker tag saving-agent:latest ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 docker push ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 ```
@@ -144,24 +144,24 @@ docker push ccr.ccs.tencentyun.com/ha-mc-server/saving-agent:latest
 #### 标记节点
 
 登录 K3s Server 节点，使用以下命令确认 K3s 正在运行且节点数量符合预期：
-```
+```bash
 kubectl get nodes
 ```
 
 如果你的集群中有一些节点，它们的 CPU 性能和内存大小不足以支撑 Minecraft Server 计算服务，那么你可以给这些节点贴上`limited-computing`标签，以便 K8s 更好地给节点分配资源：
-```
+```bash
 kubectl label node <your-node-name> limited-computing=true
 ```
 
 如果节点名称不小心写错了，可以用以下命令移除标签：
-```
+```bash
 kubectl label node <your-node-name> limited-computing-
 ```
 
 #### 创建 SeaweedFS 资源
 
 在节点的合适位置克隆本仓库，在仓库根目录下运行以下命令来启动 SeaweedFS 服务：
-```
+```bash
 kubectl apply -f ./k8s/seaweedfs/master.yaml
 kubectl apply -f ./k8s/seaweedfs/volume.yaml
 kubectl apply -f ./k8s/seaweedfs/filer.yaml
@@ -176,14 +176,14 @@ kubectl apply -f ./k8s/seaweedfs/filer.yaml
 #### 创建 Minecraft Server 及配套设施资源
 
 运行下面的命令启动游戏服务：
-```
+```bash
 kubectl apply -f ./k8s/mc-server.yaml
 ```
 
 #### 暴露端口
 
 然后使用以下命令暴露端口：
-```
+```bash
 kubectl port-forward svc/mc-server 25565:25565
 ```
 
@@ -198,7 +198,7 @@ kubectl port-forward svc/mc-server 25565:25565
 首先需要安装 Docker，参考官方文档：https://docs.docker.com/get-started/get-docker/
 
 然后使用以下命令启动一个 K3s 容器作为 K3s Agent 节点（其中 `myserver` 需要替换成服主机器的域名或公网 IP，`mytoken` 需要替换成服主提供的 token，`mynodename` 可以换成你的游戏 ID）：
-```
+```bash
 docker run -d --privileged rancher/k3s agent --token mytoken --server https://myserver:6443 --snapshotter native --node-name mynodename
 ```
 
