@@ -1,3 +1,5 @@
+[English](./README.md) | 中文简体
+
 # 高可用 Minecraft 游戏服务集群
 
 用 K3s 和 SeaweedFS 让你的 Minecraft 服务 99.9% 可用！
